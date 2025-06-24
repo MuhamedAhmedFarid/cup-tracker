@@ -5,7 +5,7 @@ const supabaseKey =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2YWliaWdiaHRwbG14Ym5yb2NhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3OTAyMTQsImV4cCI6MjA2NjM2NjIxNH0.zuF5olemFNu5InqeJBDkkcBQMorHEYo6yLlykAL9OIE";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-import { useState, useEffect } from "react";
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "./components/ui/Card";
 import { Button } from "./components/ui/Button";
 import { Progress } from "./components/ui/progress";

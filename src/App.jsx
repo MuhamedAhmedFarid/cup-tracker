@@ -6,7 +6,7 @@ const supabaseKey =
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "./components/ui/Card";
+import { Card, CardContent } from "./components/ui/Card"
 import { Button } from "./components/ui/Button";
 import { Progress } from "./components/ui/progress";
 import { Heart, Clock, Camera } from "lucide-react";

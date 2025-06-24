@@ -15,7 +15,7 @@ export default function App() {
   const [userTimestamps, setUserTimestamps] = useState([]);
   const [gfTimestamps, setGfTimestamps] = useState([]);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [nextCupTime, setNextCupTime] = useState(0);
+  const [nextCupTime, setNextCupTime] = useState(0)
   const [tab, setTab] = useState("tracker");
   const goal = 10;
 

@@ -84,11 +84,7 @@ export default function App() {
   };
 
 const handleRemoveUserCup = async () => {
-  // if (userTimestamps.length > 0) {
-  //   const updated = [...userTimestamps];
-  //   updated.pop();
-  //   setUserTimestamps(updated);
-  // }
+
   if (userTimestamps.length > 0) {
     const { error } = await supabase
       .from('user_cups')

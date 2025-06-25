@@ -83,19 +83,42 @@ export default function App() {
     else setGfTimestamps([...gfTimestamps, newCup]);
   };
 
-  const handleRemoveUserCup = () => {
-    if (userTimestamps.length > 0) {
+const handleRemoveUserCup = async () => {
+  // if (userTimestamps.length > 0) {
+  //   const updated = [...userTimestamps];
+  //   updated.pop();
+  //   setUserTimestamps(updated);
+  // }
+  if (userTimestamps.length > 0) {
+    const { error } = await supabase
+      .from('user_cups')
+      .delete()
+      .eq('id', userTimestamps[userTimestamps.length - 1].id);
+
+    if (error) {
+      console.error(error);
+    } else {
       const updated = [...userTimestamps];
       updated.pop();
       setUserTimestamps(updated);
     }
-  };
+  }
+};
 
-  const handleRemoveGfCup = () => {
+  const handleRemoveGfCup = async () => {
     if (gfTimestamps.length > 0) {
-      const updated = [...gfTimestamps];
-      updated.pop();
-      setGfTimestamps(updated);
+      const { error } = await supabase
+        .from('gf_cups')
+        .delete()
+        .eq('id', gfTimestamps[gfTimestamps.length - 1].id);
+
+      if (error) {
+        console.error(error);
+      } else {
+        const updated = [...gfTimestamps];
+        updated.pop();
+        setGfTimestamps(updated);
+      }
     }
   };
 

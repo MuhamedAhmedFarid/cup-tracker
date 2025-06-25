@@ -3,10 +3,10 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = "https://lvaibigbhtplmxbnroca.supabase.co";
 const supabaseKey =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2YWliaWdiaHRwbG14Ym5yb2NhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3OTAyMTQsImV4cCI6MjA2NjM2NjIxNH0.zuF5olemFNu5InqeJBDkkcBQMorHEYo6yLlykAL9OIE";
-const supabase = createClient(supabaseUrl, supabaseKey)
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-import { useState, useEffect } from "react"
-import { Card, CardContent } from "./components/ui/Card"
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "./components/ui/Card";
 import { Button } from "./components/ui/Button";
 import { Progress } from "./components/ui/progress";
 import { Heart, Clock, Camera } from "lucide-react";
@@ -15,7 +15,7 @@ export default function App() {
   const [userTimestamps, setUserTimestamps] = useState([]);
   const [gfTimestamps, setGfTimestamps] = useState([]);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [nextCupTime, setNextCupTime] = useState(0)
+  const [nextCupTime, setNextCupTime] = useState(0);
   const [tab, setTab] = useState("tracker");
   const goal = 10;
 
@@ -24,10 +24,14 @@ export default function App() {
 
   useEffect(() => {
     const fetchCups = async () => {
-      const { data: userCupsData } = await supabase
+      const { data: userCupsData, error: userError } = await supabase // Added error variable
         .from("user_cups")
         .select("*");
-      const { data: gfCupsData } = await supabase.from("gf_cups").select("*");
+      const { data: gfCupsData, error: gfError } = await supabase.from("gf_cups").select("*"); // Added error variable
+
+      if (userError) console.error("Error fetching user cups:", userError); // Log errors
+      if (gfError) console.error("Error fetching GF cups:", gfError); // Log errors
+
       setUserTimestamps(userCupsData || []);
       setGfTimestamps(gfCupsData || []);
     };
@@ -39,7 +43,7 @@ export default function App() {
       const now = new Date();
       const midnight = new Date();
       midnight.setHours(24, 0, 0, 0);
-      setTimeLeft(midnight - now);
+      setTimeLeft(midnight.getTime() - now.getTime()); // Use getTime() for consistent millisecond comparison
     };
     updateTimeLeft();
     const interval = setInterval(updateTimeLeft, 1000);
@@ -48,9 +52,10 @@ export default function App() {
 
   const getNextCupCountdown = (timestamps) => {
     if (!timestamps.length) return 0;
-    const last = new Date(timestamps[timestamps.length - 1].time);
-    const nextAllowed = new Date(last.getTime() + 2 * 60 * 60 * 1000);
-    return Math.max(0, nextAllowed - new Date());
+    // Ensure the timestamp is treated as UTC from DB, then compare
+    const lastTimestampUTC = new Date(timestamps[timestamps.length - 1].time + 'Z'); // *** Added 'Z' here ***
+    const nextAllowedTimeUTC = new Date(lastTimestampUTC.getTime() + 2 * 60 * 60 * 1000); // 2 hours
+    return Math.max(0, nextAllowedTimeUTC.getTime() - new Date().getTime());
   };
 
   useEffect(() => {
@@ -70,71 +75,134 @@ export default function App() {
   };
 
   const handleAddUserCup = async () => {
-    const newCup = { time: new Date().toISOString(), photo: null };
-    const { error } = await supabase.from("user_cups").insert([newCup]);
-    if (error) console.error(error);
-    else setUserTimestamps([...userTimestamps, newCup]);
+    const newCupEntry = { time: new Date().toISOString(), photo: null };
+    const { data, error } = await supabase.from("user_cups").insert([newCupEntry]).select(); // .select() to get back the inserted ID if needed for id
+
+    if (error) {
+      console.error("Error adding user cup:", error);
+    } else {
+      // Supabase insert returns an array with the new record, use data[0]
+      setUserTimestamps((prevTimestamps) => [...prevTimestamps, data[0]]);
+    }
   };
 
   const handleAddGfCup = async () => {
-    const newCup = { time: new Date().toISOString(), photo: null };
-    const { error } = await supabase.from("gf_cups").insert([newCup]);
-    if (error) console.error(error);
-    else setGfTimestamps([...gfTimestamps, newCup]);
-  };
-
-const handleRemoveUserCup = async () => {
-
-  if (userTimestamps.length > 0) {
-    const { error } = await supabase
-      .from('user_cups')
-      .delete()
-      .eq('id', userTimestamps[userTimestamps.length - 1].id);
+    const newCupEntry = { time: new Date().toISOString(), photo: null };
+    const { data, error } = await supabase.from("gf_cups").insert([newCupEntry]).select(); // .select() to get back the inserted ID
 
     if (error) {
-      console.error(error);
+      console.error("Error adding GF cup:", error);
     } else {
-      const updated = [...userTimestamps];
-      updated.pop();
-      setUserTimestamps(updated);
+      setGfTimestamps((prevTimestamps) => [...prevTimestamps, data[0]]);
     }
-  }
-};
+  };
+
+  const handleRemoveUserCup = async () => {
+    if (userTimestamps.length > 0) {
+      const cupToRemove = userTimestamps[userTimestamps.length - 1];
+      if (!cupToRemove || !cupToRemove.id) { // Ensure there's an ID to remove
+          console.warn("No ID found for last user cup to remove.");
+          return;
+      }
+
+      const { error } = await supabase
+        .from("user_cups")
+        .delete()
+        .eq("id", cupToRemove.id);
+
+      if (error) {
+        console.error("Error removing user cup:", error);
+      } else {
+        // Filter out the removed cup by its ID to ensure correct state update
+        setUserTimestamps((prevTimestamps) =>
+          prevTimestamps.filter((cup) => cup.id !== cupToRemove.id)
+        );
+      }
+    }
+  };
 
   const handleRemoveGfCup = async () => {
     if (gfTimestamps.length > 0) {
+      const cupToRemove = gfTimestamps[gfTimestamps.length - 1];
+      if (!cupToRemove || !cupToRemove.id) { // Ensure there's an ID to remove
+          console.warn("No ID found for last GF cup to remove.");
+          return;
+      }
+
       const { error } = await supabase
-        .from('gf_cups')
+        .from("gf_cups")
         .delete()
-        .eq('id', gfTimestamps[gfTimestamps.length - 1].id);
+        .eq("id", cupToRemove.id);
 
       if (error) {
-        console.error(error);
+        console.error("Error removing GF cup:", error);
       } else {
-        const updated = [...gfTimestamps];
-        updated.pop();
-        setGfTimestamps(updated);
+        // Filter out the removed cup by its ID
+        setGfTimestamps((prevTimestamps) =>
+          prevTimestamps.filter((cup) => cup.id !== cupToRemove.id)
+        );
       }
     }
   };
 
   const handlePhotoUpload = async (event, index, isUser) => {
     const file = event.target.files[0];
-    if (file) {
-      const { data, error } = await supabase.storage
+    if (!file) return;
+
+    const filePath = `${isUser ? 'user_cups' : 'gf_cups'}/${Date.now()}_${file.name}`;
+
+    try {
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from("images")
-        .upload(`user_cups/${file.name}`, file);
-      if (error) return console.error(error);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-      const url = `${supabaseUrl}/storage/v1/object/public/images/${data.path}`;
-      const updated = isUser ? [...userTimestamps] : [...gfTimestamps];
-      updated[index].photo = url;
-      isUser ? setUserTimestamps(updated) : setGfTimestamps(updated);
+      if (uploadError) {
+        console.error("Error uploading photo:", uploadError);
+        // You might want to display a user-friendly error message here
+        return;
+      }
 
-      await supabase
+      const { data: publicUrlData } = supabase.storage
+        .from('images')
+        .getPublicUrl(uploadData.path);
+
+      if (!publicUrlData || !publicUrlData.publicUrl) {
+          console.error("Could not get public URL for uploaded photo.");
+          return;
+      }
+      const photoUrl = publicUrlData.publicUrl;
+
+      const currentTimestamps = isUser ? userTimestamps : gfTimestamps;
+      const cupToUpdate = currentTimestamps[index];
+
+      if (!cupToUpdate || !cupToUpdate.id) {
+          console.error("Cup record not found or missing ID for photo update.");
+          return;
+      }
+
+      const { error: updateError } = await supabase
         .from(isUser ? "user_cups" : "gf_cups")
-        .update({ photo: url })
-        .match({ id: updated[index].id });
+        .update({ photo: photoUrl })
+        .eq("id", cupToUpdate.id);
+
+      if (updateError) {
+        console.error("Error updating photo URL in DB:", updateError);
+        // Display user-friendly error
+        return;
+      }
+
+      const updatedTimestamps = [...currentTimestamps];
+      updatedTimestamps[index] = { ...updatedTimestamps[index], photo: photoUrl };
+      isUser ? setUserTimestamps(updatedTimestamps) : setGfTimestamps(updatedTimestamps);
+
+      console.log('Photo uploaded and URL saved:', photoUrl);
+
+    } catch (generalError) {
+      console.error("An unexpected error occurred during photo upload:", generalError);
+      // Display user-friendly error
     }
   };
 
@@ -209,11 +277,12 @@ const handleRemoveUserCup = async () => {
                 <div className="flex flex-wrap gap-2 mb-2">
                   {userTimestamps.map((entry, index) => (
                     <div
-                      key={index}
+                      key={entry.id || index}
                       className="text-xs text-gray-500 flex items-center gap-1"
                     >
                       🕒{" "}
-                      {new Date(entry.time).toLocaleTimeString([], {
+                      {/* FIX: Append 'Z' to treat as UTC, then convert to local */}
+                      {new Date(entry.time + 'Z').toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
@@ -259,11 +328,12 @@ const handleRemoveUserCup = async () => {
                 <div className="flex flex-wrap gap-2 mb-2">
                   {gfTimestamps.map((entry, index) => (
                     <div
-                      key={index}
+                      key={entry.id || index}
                       className="text-xs text-gray-500 flex items-center gap-1"
                     >
                       🕒{" "}
-                      {new Date(entry.time).toLocaleTimeString([], {
+                      {/* FIX: Append 'Z' to treat as UTC, then convert to local */}
+                      {new Date(entry.time + 'Z').toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
